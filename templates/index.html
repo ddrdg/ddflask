@@ -1,19 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Web App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/5.0.2/css/bootstrap.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
 <body>
-    <div class="App">
-        <header class="App-header">
-            <img src="{{ url_for('static', filename='Octocat.png') }}" class="App-logo" alt="logo" />
-            <p>
-                GitHub Codespaces <span class="heart">♥️</span> Flask
-            </p>
-            <p class="small">
-                Edit <code>templates/index.html</code> and refresh to see your changes!
-            </p>
-        </header>
+    <div class="container mt-5">
+        <h1>Run Shell Command</h1>
+        <form id="command-form">
+            <div class="mb-3">
+                <label for="param1" class="form-label">Parameter 1</label>
+                <input type="text" class="form-control" id="param1" name="param1" required>
+            </div>
+            <div class="mb-3">
+                <label for="param2" class="form-label">Parameter 2</label>
+                <input type="text" class="form-control" id="param2" name="param2" required>
+            </div>
+            <div class="mb-3">
+                <label for="param3" class="form-label">Parameter 3</label>
+                <input type="text" class="form-control" id="param3" name="param3" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Run</button>
+            <button type="button" id="stop-button" class="btn btn-danger">Stop</button>
+        </form>
+        <div class="mt-3">
+            <h3>Output:</h3>
+            <pre id="output"></pre>
+        </div>
     </div>
-</body>
+    <script>
+        $(document).ready(function() {
+            let eventSource;
 
+            $('#command-form').on('submit', function(e) {
+                e.preventDefault();
+
+                $.ajax({
+                    url: '/start-command',
+                    type: 'POST',
+                    data: $('#command-form').serialize(),
+                    success: function(response) {
+                        $('#output').text('');  // Clear previous output
+                        if (eventSource) {
+                            eventSource.close();  // Close any existing EventSource
+                        }
+
+                        eventSource = new EventSource('/stream-output');
+
+                        eventSource.onmessage = function(event) {
+                            $('#output').append(event.data + '\n');
+                        };
+
+                        eventSource.onerror = function(event) {
+                            $('#output').append('An error occurred: ' + (event.data || 'undefined') + '\n');
+                            eventSource.close();
+                        };
+                    },
+                    error: function(xhr) {
+                        $('#output').append('An error occurred: ' + xhr.responseText + '\n');
+                    }
+                });
+            });
+
+            $('#stop-button').on('click', function() {
+                $.ajax({
+                    url: '/stop-command',
+                    type: 'POST',
+                    success: function(response) {
+                        $('#output').append(response.output + '\n');
+                        if (eventSource) {
+                            eventSource.close();
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#output').append('An error occurred: ' + xhr.responseText + '\n');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
 </html>
